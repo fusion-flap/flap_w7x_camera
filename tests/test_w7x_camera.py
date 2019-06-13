@@ -14,9 +14,10 @@ flap_w7x_camera.register()
 
 def test_get_data():
     try:
-        flap.get_data('W7X_CAMERA',exp_id="20181018.032", name="AEQ20_EDICAM_ROIP2", options={'Time': '154804'}, object_name="cam")
+        flap.get_data('W7X_CAMERA',exp_id="20181018.032", name="AEQ20_EDICAM_ROIP1", options={'Time': '154804'}, object_name="EDI_ROIP1")
     except Exception  as e:
         raise e
+    flap.list_data_objects()
+    flap.slice_data('EDI_ROIP1',slicing={'Time':0}, output_name='EDI_sliced')
 
 test_get_data()
-flap.plot('cam',slicing={'Time':2},plot_type='image')

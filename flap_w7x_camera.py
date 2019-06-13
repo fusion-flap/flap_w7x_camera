@@ -111,7 +111,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             Port: the port number the camera was used, e.g. AEQ20
     """
 
-    default_options = {'Datapath': None,
+    default_options = {'Datapath': '',
                        'Time': None,
                        'Max_size': None  # in GB!
                        }
@@ -286,16 +286,16 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
     coord[4] = copy.deepcopy(flap.Coordinate(name='Image x',
                                              unit='Pixel',
                                              mode=flap.CoordinateMode(equidistant=True),
-                                             start=info['X Start'],
-                                             step=1,
+                                             start=int(info['X Start']),
+                                             step=int(1),
                                              shape=[],
                                              dimension_list=[0])
                              )
     coord[5] = copy.deepcopy(flap.Coordinate(name='Image y',
                                              unit='Pixel',
                                              mode=flap.CoordinateMode(equidistant=True),
-                                             start=info['Y Start'],
-                                             step=1,
+                                             start=int(info['Y Start']),
+                                             step=int(1),
                                              shape=[],
                                              dimension_list=[1])
                              )
