@@ -248,29 +248,36 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
     data_dim = 1  # What is this???
     read_range = None  # What is this???
     coord = [None] * data_dim * 4
+    print(time_vec_sec)
+    print(data_arr.shape)
+    print(time_vec_sec.shape)
     # TODO: check for equidistant time coordinates!
     coord[0] = copy.deepcopy(flap.Coordinate(name='Time',
                                              unit='Second',
                                              mode=flap.CoordinateMode(equidistant=False),
                                              values=time_vec_sec,
+                                             shape=time_vec_sec.shape,
                                              dimension_list=[2])
                              )
     coord[1] = copy.deepcopy(flap.Coordinate(name='ETUTime',
                                              unit='ETU',
                                              mode=flap.CoordinateMode(equidistant=False),
                                              values=time_vec_etu,
+                                             shape=time_vec_etu.shape,
                                              dimension_list=[2])
                              )
     coord[2] = copy.deepcopy(flap.Coordinate(name='W7XTime',
                                              unit='Nanosecond',
                                              mode=flap.CoordinateMode(equidistant=False),
                                              values=time_vec_w7x,
+                                             shape=time_vec_w7x.shape,
                                              dimension_list=[2])
                              )
     coord[3] = copy.deepcopy(flap.Coordinate(name='Sample',
-                                             unit=None,
+                                             unit='',
                                              mode=flap.CoordinateMode(equidistant=False),
                                              values=frame_vec,
+                                             shape=frame_vec.shape,
                                              dimension_list=[2])
                              )
 

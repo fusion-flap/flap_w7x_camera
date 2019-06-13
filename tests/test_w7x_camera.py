@@ -13,7 +13,8 @@ flap_w7x_camera.register()
 
 
 def test_get_data():
-    flap.get_data('W7X_CAMERA',exp_id="20181018.032", name="AEQ20_EDICAM_ROIP1", options={'Datapath': '/data/W7-X/', 'Time': '154804', 'Max_size':4})
+    flap.get_data('W7X_CAMERA',exp_id="20181018.032", name="AEQ20_EDICAM_ROIP1", options={'Datapath': '/data/W7-X/', 'Time': '154804', 'Max_size':4}, object_name="cam")
     pass
 
 test_get_data()
+flap.list_data_objects()
