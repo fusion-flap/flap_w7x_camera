@@ -16,14 +16,13 @@ import h5py
 import pylab as plt
 
 
-def get_camera_config_h5(h5_obj):
+def get_camera_config_h5(h5_obj, roi_num):
     """
     This function parses the Settings field of the HDF5 file (if available)
     and counts the ROIPs with data. This latter will determine
     the channel names.
     """
     info = dict()
-    print("In get_camera_config_h5.")
     # Get the actual data
     # print(list(h5_obj.keys()))
     # print(list(h5_obj['Settings'].keys()))
@@ -47,6 +46,11 @@ def get_camera_config_h5(h5_obj):
     info['ROIP'] = h5_obj['Settings']['ROIP']
     info['Sensor Control'] = h5_obj['Settings']['Sensor Control']
     info['Sensor Settings'] = h5_obj['Settings']['Sensor Settings']
+    info['X Start'] = h5_obj['Settings']['ROIP'][roi_num]['X Start'][0]
+    info['X Len'] = h5_obj['Settings']['ROIP'][roi_num]['X Len'][0]
+    info['Y Start'] = h5_obj['Settings']['ROIP'][roi_num]['Y Start'][0]
+    info['Y Len'] = h5_obj['Settings']['ROIP'][roi_num]['Y Len'][0]
+
     print("-------------------------")
     print(info)
     return info
@@ -79,7 +83,7 @@ def read_hdf5_arr(h5_data, x, y, frame_vec):
 
     # low level frame reading
     data_space = h5_data.get_space()
-    dims = data_space.shape
+    # dims = data_space.shape
     arr_full = np.zeros((endx - startx, endy - starty, frame_vec.shape[0]), dtype=h5_data.dtype)
     arr = np.zeros((endx - startx, endy - starty), dtype=h5_data.dtype)
     count = (endx, endy, 1)
@@ -143,11 +147,10 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
         date = exp_id_split[0]
         exp_num = exp_id_split[1]
         filename = "_".join([port.upper(), cam_str, date, exp_num, (time + ".h5")])
-        print(filename)
-        print(datapath, cam_name.upper(), port.upper(), date, filename)
 
         path = os.path.join(datapath, cam_name.upper(), port.upper(), date, filename)
-        print("The constructed path is: {}.".format(path))
+        if flap.VERBOSE:
+            print("The constructed path is: {}.".format(path))
 
         if not os.path.exists(path):
             filename = "_".join([port.upper(), cam_str, date, (time + ".h5")])
@@ -166,9 +169,9 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
     # Getting the file info
     with h5py.File(path, 'r') as h5_obj:
             try:
-                info = get_camera_config_h5(h5_obj)
+                info = get_camera_config_h5(h5_obj, roi_num)
             except Exception as e:
-                print("Not found the camera config:")
+                print("Camera config is not found:")
                 print(e)
                 try:
                     info = get_camera_config_ascii(path)
@@ -247,7 +250,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
     # Even if we have no_data=True, we need to know the coordinate ranges!
     data_dim = 1  # What is this???
     read_range = None  # What is this???
-    coord = [None] * data_dim * 4
+    coord = [None] * data_dim * 6
     print(time_vec_sec)
     print(data_arr.shape)
     print(time_vec_sec.shape)
@@ -279,6 +282,22 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                                              values=frame_vec,
                                              shape=frame_vec.shape,
                                              dimension_list=[2])
+                             )
+    coord[4] = copy.deepcopy(flap.Coordinate(name='Image x',
+                                             unit='Pixel',
+                                             mode=flap.CoordinateMode(equidistant=True),
+                                             start=info['X Start'],
+                                             step=1,
+                                             shape=[],
+                                             dimension_list=[0])
+                             )
+    coord[5] = copy.deepcopy(flap.Coordinate(name='Image y',
+                                             unit='Pixel',
+                                             mode=flap.CoordinateMode(equidistant=True),
+                                             start=info['Y Start'],
+                                             step=1,
+                                             shape=[],
+                                             dimension_list=[1])
                              )
 
     data_title = "W7-X CAMERA data: {}".format(data_name)
