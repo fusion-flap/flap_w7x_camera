@@ -16,10 +16,6 @@ import h5py
 import pylab as plt
 
 
-if (flap.VERBOSE):
-    print("Importing flap_w7x-camera")
-
-
 def get_camera_config_h5(h5_obj):
     """
     This function parses the Settings field of the HDF5 file (if available)
@@ -257,25 +253,25 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                                              unit='Second',
                                              mode=flap.CoordinateMode(equidistant=False),
                                              values=time_vec_sec,
-                                             dimension_list=[0])
+                                             dimension_list=[2])
                              )
-    coord[1] = copy.deepcopy(flap.Coordinate(name='Time',
+    coord[1] = copy.deepcopy(flap.Coordinate(name='ETUTime',
                                              unit='ETU',
                                              mode=flap.CoordinateMode(equidistant=False),
                                              values=time_vec_etu,
-                                             dimension_list=[0])
+                                             dimension_list=[2])
                              )
-    coord[2] = copy.deepcopy(flap.Coordinate(name='Time',
+    coord[2] = copy.deepcopy(flap.Coordinate(name='W7XTime',
                                              unit='Nanosecond',
                                              mode=flap.CoordinateMode(equidistant=False),
                                              values=time_vec_w7x,
-                                             dimension_list=[0])
+                                             dimension_list=[2])
                              )
     coord[3] = copy.deepcopy(flap.Coordinate(name='Sample',
                                              unit=None,
                                              mode=flap.CoordinateMode(equidistant=False),
                                              values=frame_vec,
-                                             dimension_list=[0])
+                                             dimension_list=[2])
                              )
 
     data_title = "W7-X CAMERA data: {}".format(data_name)
