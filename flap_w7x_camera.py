@@ -292,6 +292,6 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
 def add_coordinate(data_object, new_coordinates, options=None):
     raise NotImplementedError("Coordinate conversions not implemented yet.")
 
-
-flap.register_data_source('W7X_CAMERA',
-                          get_data_func=w7x_camera_get_data)
+def register():
+    flap.register_data_source('W7X_CAMERA',
+                              get_data_func=w7x_camera_get_data)
