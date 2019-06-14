@@ -184,6 +184,36 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
 
     print(info)
 
+    # Read the time vectors
+    with h5py.File(path, 'r') as h5_obj:
+        try:
+            time_vec_etu = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}ETU'.format(roi_num.upper())])
+            print("ETU time vector found!")
+        except Exception as e:
+            print("Cannot read ETU! Error message:")
+            print(e)
+            time_vec_etu = None
+        try:
+            time_vec_w7x = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}W7XTime'.format(roi_num.upper())])
+            print("W7-X time vector found!")
+        except Exception as e:
+            print("Cannot read W7-X time units (ns)! Error message:")
+            print(e)
+            time_vec_w7x = None
+        
+        if time_vec_w7x is not None:
+            print("Using W7-X time vector [ns] for time vector [s] calculation!")
+            time_vec_sec = (time_vec_w7x - time_vec_w7x[0]) / 1.e9
+        elif time_vec_etu is not None:
+            print("Using ETU time vector [100 ns] for time vector [s] calculation!")
+            time_vec_sec = (time_vec_etu - time_vec_etu[0]) / 1.e7
+        else:
+            print("Cannot find any meaningful time vector!")
+            print("Exiting...")
+            raise IOError("No time vector found!")
+
+    # TODO: handle the time slice case! (Assume, that the time coordinate slice will come with seconds!)
+
     if no_data:
         data_arr = None
     else:
@@ -218,34 +248,6 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             raise NotImplementedError("Cannot read data based on coordinates yet!")
         
         h5_obj.close()
-
-        # Read the time vectors
-        with h5py.File(path, 'r') as h5_obj:
-            try:
-                time_vec_etu = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}ETU'.format(roi_num.upper())])
-                print("ETU time vector found!")
-            except Exception as e:
-                print("Cannot read ETU! Error message:")
-                print(e)
-                time_vec_etu = None
-            try:
-                time_vec_w7x = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}W7XTime'.format(roi_num.upper())])
-                print("W7-X time vector found!")
-            except Exception as e:
-                print("Cannot read W7-X time units (ns)! Error message:")
-                print(e)
-                time_vec_w7x = None
-            
-            if time_vec_w7x is not None:
-                print("Using W7-X time vector [ns] for time vector [s] calculation!")
-                time_vec_sec = (time_vec_w7x - time_vec_w7x[0]) / 1.e9
-            elif time_vec_etu is not None:
-                print("Using ETU time vector [100 ns] for time vector [s] calculation!")
-                time_vec_sec = (time_vec_etu - time_vec_etu[0]) / 1.e7
-            else:
-                print("Cannot find any meaningful time vector!")
-                print("Exiting...")
-                raise IOError("No time vector found!")
 
     # Even if we have no_data=True, we need to know the coordinate ranges!
     data_dim = 1  # What is this???
