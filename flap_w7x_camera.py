@@ -212,8 +212,6 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             print("Exiting...")
             raise IOError("No time vector found!")
 
-    # TODO: handle the time slice case! (Assume, that the time coordinate slice will come with seconds!)
-
     if no_data:
         data_arr = None
     else:
@@ -230,10 +228,10 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             print(e)
         
         # Read the data
+        data_space = h5_data.get_space()
+        dims = data_space.shape
         if coordinates == None:
             # Indices contain everything!
-            data_space = h5_data.get_space()
-            dims = data_space.shape
             x = (0, dims[0])
             y = (0, dims[1])
             frame_vec = np.arange(0, dims[2])
@@ -241,12 +239,30 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
         else:
             # Take indices from the coordinates!
             # Only time coordinates are working as of now (2019. June 11.)
+            if (type(coordinates) is not list):
+             _coordinates = [coordinates]
+            else:
+                _coordinates = coordinates
+            for coord in _coordinates:
+                if (type(coord) is not flap.Coordinate):
+                    raise TypeError("Coordinate description should be flap.Coordinate.")
+                if (coord.unit.name is 'Time'):  # assuming the unit to be Second
+                    if (coord.unit.unit is not 'Second'):
+                        raise NotImplementedError("Your time coordinate unit is not in Seconds! Cannot use it (yet).")
+                    if (coord.mode.equidistant):
+                        read_range = [float(coord.c_range[0]),float(coord.c_range[1])]
+                        # Since np.where gives back indices, it is the same as the frame_vec
+                        frame_vec = np.where((time_vec_sec >= read_range[0]) & (time_vec_sec <= read_range[1]))
+                    else:
+                        # TODO: implement this, we need it!
+                        # TODO: construct the frame_num vector!
+                        frame_vec = None
+                        raise NotImplementedError("Non-equidistant Time axis is not implemented yet.")
+            
             # TODO: make this for the spatial coordinates as well! (Binning etc.)
-            data_arr = None
-            time_vec = None
-            frame_vec = None
-            raise NotImplementedError("Cannot read data based on coordinates yet!")
-        
+            x = (0, dims[0])
+            y = (0, dims[1])
+            data_arr = read_hdf5_arr(h5_data, x, y, frame_vec)
         h5_obj.close()
 
     # Even if we have no_data=True, we need to know the coordinate ranges!
