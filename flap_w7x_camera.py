@@ -96,6 +96,7 @@ def read_hdf5_arr(h5_data, x, y, frame_vec):
         result_space = h5py.h5s.create_simple(count)
         h5_data.read(result_space, data_space, arr)
         arr_full[:, :, h_i] = arr
+        h_i = h_i + 1
     
     return arr_full
 
