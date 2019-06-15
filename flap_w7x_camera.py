@@ -96,6 +96,7 @@ def read_hdf5_arr(h5_data, x, y, frame_vec):
         result_space = h5py.h5s.create_simple(count)
         h5_data.read(result_space, data_space, arr)
         arr_full[:, :, h_i] = arr
+        h_i = h_i + 1
     
     return arr_full
 
@@ -184,6 +185,34 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
 
     print(info)
 
+    # Read the time vectors
+    with h5py.File(path, 'r') as h5_obj:
+        try:
+            time_vec_etu = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}ETU'.format(roi_num.upper())])
+            print("ETU time vector found!")
+        except Exception as e:
+            print("Cannot read ETU! Error message:")
+            print(e)
+            time_vec_etu = None
+        try:
+            time_vec_w7x = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}W7XTime'.format(roi_num.upper())])
+            print("W7-X time vector found!")
+        except Exception as e:
+            print("Cannot read W7-X time units (ns)! Error message:")
+            print(e)
+            time_vec_w7x = None
+        
+        if time_vec_w7x is not None:
+            print("Using W7-X time vector [ns] for time vector [s] calculation!")
+            time_vec_sec = (time_vec_w7x - time_vec_w7x[0]) / 1.e9
+        elif time_vec_etu is not None:
+            print("Using ETU time vector [100 ns] for time vector [s] calculation!")
+            time_vec_sec = (time_vec_etu - time_vec_etu[0]) / 1.e7
+        else:
+            print("Cannot find any meaningful time vector!")
+            print("Exiting...")
+            raise IOError("No time vector found!")
+
     if no_data:
         data_arr = None
     else:
@@ -200,10 +229,10 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             print(e)
         
         # Read the data
+        data_space = h5_data.get_space()
+        dims = data_space.shape
         if coordinates == None:
             # Indices contain everything!
-            data_space = h5_data.get_space()
-            dims = data_space.shape
             x = (0, dims[0])
             y = (0, dims[1])
             frame_vec = np.arange(0, dims[2])
@@ -211,41 +240,31 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
         else:
             # Take indices from the coordinates!
             # Only time coordinates are working as of now (2019. June 11.)
-            # TODO: make this for the spatial coordinates as well! (Binning etc.)
-            data_arr = None
-            time_vec = None
-            frame_vec = None
-            raise NotImplementedError("Cannot read data based on coordinates yet!")
-        
-        h5_obj.close()
-
-        # Read the time vectors
-        with h5py.File(path, 'r') as h5_obj:
-            try:
-                time_vec_etu = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}ETU'.format(roi_num.upper())])
-                print("ETU time vector found!")
-            except Exception as e:
-                print("Cannot read ETU! Error message:")
-                print(e)
-                time_vec_etu = None
-            try:
-                time_vec_w7x = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}W7XTime'.format(roi_num.upper())])
-                print("W7-X time vector found!")
-            except Exception as e:
-                print("Cannot read W7-X time units (ns)! Error message:")
-                print(e)
-                time_vec_w7x = None
-            
-            if time_vec_w7x is not None:
-                print("Using W7-X time vector [ns] for time vector [s] calculation!")
-                time_vec_sec = (time_vec_w7x - time_vec_w7x[0]) / 1.e9
-            elif time_vec_etu is not None:
-                print("Using ETU time vector [100 ns] for time vector [s] calculation!")
-                time_vec_sec = (time_vec_etu - time_vec_etu[0]) / 1.e7
+            if (type(coordinates) is not list):
+             _coordinates = [coordinates]
             else:
-                print("Cannot find any meaningful time vector!")
-                print("Exiting...")
-                raise IOError("No time vector found!")
+                _coordinates = coordinates
+            for coord in _coordinates:
+                if (type(coord) is not flap.Coordinate):
+                    raise TypeError("Coordinate description should be flap.Coordinate.")
+                if (coord.unit.name is 'Time'):  # assuming the unit to be Second
+                    if (coord.unit.unit is not 'Second'):
+                        raise NotImplementedError("Your time coordinate unit is not in Seconds! Cannot use it (yet).")
+                    if (coord.mode.equidistant):
+                        read_range = [float(coord.c_range[0]),float(coord.c_range[1])]
+                        # Since np.where gives back indices, it is the same as the frame_vec
+                        frame_vec = np.where((time_vec_sec >= read_range[0]) & (time_vec_sec <= read_range[1]))
+                    else:
+                        # TODO: implement this, we need it!
+                        # TODO: construct the frame_num vector!
+                        frame_vec = None
+                        raise NotImplementedError("Non-equidistant Time axis is not implemented yet.")
+            
+            # TODO: make this for the spatial coordinates as well! (Binning etc.)
+            x = (0, dims[0])
+            y = (0, dims[1])
+            data_arr = read_hdf5_arr(h5_data, x, y, frame_vec)
+        h5_obj.close()
 
     # Even if we have no_data=True, we need to know the coordinate ranges!
     data_dim = 1  # What is this???
