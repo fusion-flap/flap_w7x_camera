@@ -14,17 +14,24 @@ flap_w7x_camera.register()
 
 def test_get_data():
     try:
-       flap.get_data('W7X_CAMERA',exp_id="20181018.032", name="AEQ20_EDICAM_ROIP1", options={'Time': '154804'}, object_name="EDI_ROIP1")
-#        flap.get_data('W7X_CAMERA',exp_id="20181018.012", name="AEQ21_PHOTRON_ROIP1", options={'Time': '115302'}, object_name="PHOT_ROIP1")        
+#       flap.get_data('W7X_CAMERA',exp_id="20181018.032", name="AEQ20_EDICAM_ROIP1", coordinates={'Time':[3,4]}, object_name="EDI_ROIP1")
+       flap.get_data('W7X_CAMERA',
+                     exp_id="20181018.012", 
+                     name="AEQ21_PHOTRON_ROIP1",  
+                     coordinates={'Time':[6.05,6.2]},
+                     no_data=False, 
+                     object_name="CAMERA")        
     except Exception  as e:
         raise e
-    print("Slicing start")
-    flap.slice_data('EDI_ROIP1',
-                    slicing={'Image x':flap.Intervals(0,9,step=10),'Image y':flap.Intervals(0,9,step=10)},
-                    summing={'Interval(Image x) sample index':'Mean','Interval(Image y) sample index':'Mean'},
-                    output_name='EDI_sliced')
-    print("Slicing stop") 
-
     flap.list_data_objects()
+    
+    flap.plot("CAMERA",plot_type='anim-image',axes=['Image x','Image y','Time'],options={'Wait':0.01,'Clear':True})   
+#    print("Slicing start")
+#    flap.slice_data('EDI_ROIP1',
+#                    slicing={'Image x':flap.Intervals(0,9,step=10),'Image y':flap.Intervals(0,9,step=10)},
+#                    summing={'Interval(Image x) sample index':'Mean','Interval(Image y) sample index':'Mean'},
+#                    output_name='EDI_sliced')
+#    print("Slicing stop") 
+
 
 test_get_data()

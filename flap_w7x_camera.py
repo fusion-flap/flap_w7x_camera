@@ -9,11 +9,15 @@ This is the flap module for W7-X camera diagnostic
 """
 
 import os.path
-import flap
+import fnmatch
 import numpy as np
 import copy
 import h5py
 import pylab as plt
+import scipy.io as io
+
+import flap
+
 
 
 def get_camera_config_h5(h5_obj, roi_num):
@@ -79,7 +83,8 @@ def read_hdf5_arr(h5_data, x, y, frame_vec):
     """
     (startx, endx) = x
     (starty, endy) = y
-    frame_vec = np.array(frame_vec)
+    if (type(frame_vec) is not np.ndarray):
+        frame_vec = np.array(frame_vec)
 
     # low level frame reading
     data_space = h5_data.get_space()
@@ -112,20 +117,28 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             Port: the port number the camera was used, e.g. AEQ20
     """
 
-    default_options = {'Datapath': '',
+    default_options = {'Datapath': 'data',
                        'Time': None,
-                       'Max_size': None  # in GB!
+                       'Max_size': 4  # in GB!
                        }
     _options = flap.config.merge_options(default_options, options, data_source='W7X_CAMERA')
 
     name_split = data_name.split("_")
     port = name_split[0]
-    cam_name = name_split[1]
+    cam_name = name_split[1].upper()
     roi_num = name_split[2]
 
     datapath = _options['Datapath']
     time = _options['Time']
     max_size = _options['Max_size']
+
+    if (coordinates is None):
+        _coordinates = []
+    else:
+        if (type(coordinates) is not list):
+            _coordinates = [coordinates]
+        else:
+            _coordinates = coordinates
 
     if port is None:
         raise ValueError("Port name and number should be set for W7X camera! (E.g. AEQ20)")
@@ -141,81 +154,87 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
     else:
         raise ValueError("Camera name should be either EDICAM or PHOTRON, not {}.".format(cam_name))
 
-    if (exp_id is None) or (time is None):
-        raise ValueError('Both exp_id and Time should be set for W7X camera for now.')
-    else:  # yeah, yeah, just to cover all the cases
-        exp_id_split = exp_id.split('.')
-        date = exp_id_split[0]
-        exp_num = exp_id_split[1]
-        filename = "_".join([port.upper(), cam_str, date, exp_num, (time + ".h5")])
-
-        path = os.path.join(datapath, cam_name.upper(), port.upper(), date, filename)
-        if flap.VERBOSE:
-            print("The constructed path is: {}.".format(path))
-
-        if not os.path.exists(path):
-            filename = "_".join([port.upper(), cam_str, date, (time + ".h5")])
-            path = os.path.join(datapath, cam_name.upper(), port.upper(), date, filename)
-            print("Not found the file, trying an alternative path: {}.".format(path))
-            if not os.path.exists(path):
-                raise FileNotFoundError
-
-    file_size = os.path.getsize(path)  # in bytes!
-    file_size = file_size / 1024**3  # in GB
-    
-    if file_size > max_size:
-        print("The size of {} is too large. (size: {} GB, limit: {} GB.)".format(path, file_size, max_size))
-        raise IOError("File size is too large!")
-
-    # Getting the file info
-    with h5py.File(path, 'r') as h5_obj:
-            try:
-                info = get_camera_config_h5(h5_obj, roi_num)
-            except Exception as e:
-                print("Camera config is not found:")
-                print(e)
-                try:
-                    info = get_camera_config_ascii(path)
-                except Exception as e:
-                    print("Cannot read the info file!")
-                    print(e)
-            finally:
-                if info is None:
-                    info = dict()
-
-    print(info)
-
-    # Read the time vectors
-    with h5py.File(path, 'r') as h5_obj:
-        try:
-            time_vec_etu = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}ETU'.format(roi_num.upper())])
-            print("ETU time vector found!")
-        except Exception as e:
-            print("Cannot read ETU! Error message:")
-            print(e)
-            time_vec_etu = None
-        try:
-            time_vec_w7x = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}W7XTime'.format(roi_num.upper())])
-            print("W7-X time vector found!")
-        except Exception as e:
-            print("Cannot read W7-X time units (ns)! Error message:")
-            print(e)
-            time_vec_w7x = None
-        
-        if time_vec_w7x is not None:
-            print("Using W7-X time vector [ns] for time vector [s] calculation!")
-            time_vec_sec = (time_vec_w7x - time_vec_w7x[0]) / 1.e9
-        elif time_vec_etu is not None:
-            print("Using ETU time vector [100 ns] for time vector [s] calculation!")
-            time_vec_sec = (time_vec_etu - time_vec_etu[0]) / 1.e7
-        else:
-            print("Cannot find any meaningful time vector!")
-            print("Exiting...")
-            raise IOError("No time vector found!")
-
-    if no_data:
-        data_arr = None
+    if (exp_id is None):
+        raise ValueError('Both exp_id should be set for W7X camera.')
+    exp_id_split = exp_id.split('.')
+    date = exp_id_split[0]
+    exp_num = exp_id_split[1]
+    dp = os.path.join(datapath, cam_name.upper(), port.upper(), date)
+    flist = os.listdir(dp)
+    if (time is None):
+        filename_mask = "_".join([port.upper(), cam_str, date, exp_num, ("*.h5")])
     else:
+        filename_mask = "_".join([port.upper(), cam_str, date, exp_num, (time + ".h5")])
+    fnames = fnmatch.filter(flist, filename_mask)
+    if (len(fnames) > 1):
+        if (time is not None):
+            raise ValueError("Multiple files found, 'Time' option should be set?")
+        else:
+            raise ValueError("Multiple files found:{:s}.".format(os.path.join(dp,filename_mask))) 
+    elif (len(fnames) == 0):
+        if (time is not None):
+            filename_mask = "_".join([port.upper(), cam_str, date, (time + ".h5")])
+            fnames = fnmatch.filter(flist, filename_mask)
+            if (len(fnames) == 0):
+                raise ValueError("Cannot find any file for this measurement.")
+            else:
+                time = fnames[0].split('_')[3]
+                time = time.split('.')[0]
+        else:
+            raise ValueError("Cannot find file file without time parameter.")
+    else:
+        time = fnames[0].split('_')[4]
+        time = time.split('.')[0]
+        
+    path = os.path.join(dp,fnames[0]) 
+
+    if (cam_name == 'EDICAM'):
+        # Getting the file info
+        with h5py.File(path, 'r') as h5_obj:
+                try:
+                    info = get_camera_config_h5(h5_obj, roi_num)
+                except Exception as e:
+                    print("Camera config is not found:")
+                    print(e)
+                    try:
+                        info = get_camera_config_ascii(path)
+                    except Exception as e:
+                        print("Cannot read the info file!")
+                        print(e)
+                finally:
+                    if info is None:
+                        info = dict()
+    
+        print(info)
+    
+        # Read the time vectors
+        with h5py.File(path, 'r') as h5_obj:
+            try:
+                time_vec_etu = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}ETU'.format(roi_num.upper())])
+                #print("ETU time vector found!")
+            except Exception as e:
+                print("Cannot read ETU! Error message:")
+                print(e)
+                time_vec_etu = None
+            try:
+                time_vec_w7x = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}W7XTime'.format(roi_num.upper())])
+                #print("W7-X time vector found!")
+            except Exception as e:
+                print("Cannot read W7-X time units (ns)! Error message:")
+                print(e)
+                time_vec_w7x = None
+            
+            if time_vec_w7x is not None:
+                print("Using W7-X time vector [ns] for time vector [s] calculation!")
+                time_vec_sec = (time_vec_w7x - time_vec_w7x[0]) / 1.e9
+            elif time_vec_etu is not None:
+                print("Using ETU time vector [100 ns] for time vector [s] calculation!")
+                time_vec_sec = (time_vec_etu - time_vec_etu[0]) / 1.e7
+            else:
+                print("Cannot find any meaningful time vector!")
+                print("Exiting...")
+                raise IOError("No time vector found!")
+    
         # Open the file and check the data path and read the data
         try:
             h5_obj = h5py.h5f.open(path.encode('utf-8'))
@@ -233,94 +252,222 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
         dims = data_space.shape
         if coordinates == None:
             # Indices contain everything!
-            x = (0, dims[0])
-            y = (0, dims[1])
             frame_vec = np.arange(0, dims[2])
-            data_arr = read_hdf5_arr(h5_data, x, y, frame_vec)
         else:
             # Take indices from the coordinates!
             # Only time coordinates are working as of now (2019. June 11.)
-            if (type(coordinates) is not list):
-             _coordinates = [coordinates]
-            else:
-                _coordinates = coordinates
             for coord in _coordinates:
                 if (type(coord) is not flap.Coordinate):
                     raise TypeError("Coordinate description should be flap.Coordinate.")
                 if (coord.unit.name is 'Time'):  # assuming the unit to be Second
-                    if (coord.unit.unit is not 'Second'):
-                        raise NotImplementedError("Your time coordinate unit is not in Seconds! Cannot use it (yet).")
-                    if (coord.mode.equidistant):
-                        read_range = [float(coord.c_range[0]),float(coord.c_range[1])]
-                        # Since np.where gives back indices, it is the same as the frame_vec
-                        frame_vec = np.where((time_vec_sec >= read_range[0]) & (time_vec_sec <= read_range[1]))
-                    else:
-                        # TODO: implement this, we need it!
-                        # TODO: construct the frame_num vector!
-                        frame_vec = None
-                        raise NotImplementedError("Non-equidistant Time axis is not implemented yet.")
+    #                if (coord.unit.unit is not 'Second'):
+    #                    raise NotImplementedError("Your time coordinate unit is not in Seconds! Cannot use it (yet).")
+                    if (coord.c_range is None):
+                        raise NotImplementedError("At present only simple tie range selection is supported.")
+                    read_range = [float(coord.c_range[0]),float(coord.c_range[1])]
+                    # Since np.where gives back indices, it is the same as the frame_vec
+                    n_frames = len(time_vec_sec)
+                    frame_vec = np.where((time_vec_sec >= read_range[0]) & (time_vec_sec <= read_range[1]))[0]
+                    time_vec_sec = time_vec_sec[frame_vec]
+                    time_vec_etu = time_vec_etu[frame_vec]
+                    time_vec_w7x = time_vec_w7x[frame_vec]
+                else:
+                    raise NotImplementedError("Coordinate selection for image coordinates is not supported yet.")
             
-            # TODO: make this for the spatial coordinates as well! (Binning etc.)
-            x = (0, dims[0])
-            y = (0, dims[1])
+            dt = time_vec_sec[1:] - time_vec_sec[0:-1]
+            if (np.nonzero((np.abs(dt[0] - dt) / dt[0]) > 0.001)[0].size == 0):
+                time_equidistant = True
+                time_step = dt[0]
+                time_start = time_vec_sec[0]
+            else:
+                time_equidistant = False
+        # TODO: make this for the spatial coordinates as well! (Binning etc.)
+        x = (0, dims[0])
+        y = (0, dims[1])
+        # We will set data_shape in flap.DataObject to show what the shape would be if data was read
+        if (no_data):
+            data_arr = None
+            data_shape = (dims[0],dims[1],len(frame_vec))
+        else:
+            file_size = os.path.getsize(path)  # in bytes!
+            file_size = file_size / 1024**3  # in GB
+            fraction = len(frame_vec) / n_frames            
+            if file_size * fraction > max_size:
+                print("The expected read size from {} is too large. (size: {} GB, limit: {} GB.)".format(path, file_size * fraction, max_size))
+                raise IOError("File size is too large!")          
             data_arr = read_hdf5_arr(h5_data, x, y, frame_vec)
+            data_shape = data_arr.shape
         h5_obj.close()
-
-    # Even if we have no_data=True, we need to know the coordinate ranges!
-    data_dim = 1  # What is this???
-    read_range = None  # What is this???
-    coord = [None] * data_dim * 6
-    print(time_vec_sec)
-    print(data_arr.shape)
-    print(time_vec_sec.shape)
+    elif (cam_name == 'PHOTRON'):
+        time_fn = os.path.join(dp,"_".join([port.upper(), cam_str, date, time, 'integ', ('v1' + ".sav")])) 
+        time_fn = time_fn.replace('\\','/',)
+        try:
+            idldat = io.readsav(time_fn,python_dict=True,verbose=False)
+        except IOError as e:
+            raise IOError("Error reading file {:s}.".format(time_fn))
+        time_vec_sec = idldat['resa'][0][4]
+        time_vec_etu = None
+        time_vec_w7x = None
+        frame_per_trig = idldat['resa'][0][15]['frame_per_trig'][0]
+        rec_rate = idldat['resa'][0][15]['frame_per_trig'][0]
+        trig_times = []
+        for i in range(0,len(time_vec_sec),frame_per_trig):
+            trig_times.append(time_vec_sec[i])
+        trig_times = np.array(trig_times)
+        meas_end_times = trig_times + 1. / rec_rate * (frame_per_trig - 1)
+                # Open the file and check the data path and read the data
+        try:
+            h5_obj = h5py.h5f.open(path.encode('utf-8'))
+            print(roi_num)
+            h5_path = '/ROIP/{}/{}Data'.format(roi_num.upper(), roi_num.upper())
+            print("Opening {} with path {}.".format(roi_num.upper(), h5_path))
+            h5_data = h5py.h5d.open(h5_obj, h5_path.encode('utf-8'))
+            print("Data size: {}.".format(h5_data.shape))
+        except Exception as e:
+            print("Something bad happened:")
+            print(e)        
+        data_space = h5_data.get_space()
+        dims = data_space.shape
+        if (dims[2] != len(time_vec_sec)):
+            RuntimeError("Frame number in HDF5 file and time file are different.")
+        n_frames = dims[2]
+        for coord in _coordinates:
+            if (type(coord) is not flap.Coordinate):
+                raise TypeError("Coordinate description should be flap.Coordinate.")
+            if (coord.unit.name is 'Time'):  # assuming the unit to be Second
+        #                if (coord.unit.unit is not 'Second'):
+        #                    raise NotImplementedError("Your time coordinate unit is not in Seconds! Cannot use it (yet).")
+                if (coord.c_range is None):
+                    raise NotImplementedError("At present only simple tie range selection is supported.")
+                read_range = [float(coord.c_range[0]),float(coord.c_range[1])]
+                # Since np.where gives back indices, it is the same as the frame_vec
+                frame_vec = np.nonzero(np.logical_and((time_vec_sec >= read_range[0]),(time_vec_sec < read_range[1])))[0]
+                if (len(frame_vec) == 0):
+                    raise ValueError("No data in time range.")
+                start_block = int(frame_vec[0] // frame_per_trig)
+                end_block = int(frame_vec[-1] // frame_per_trig)
+                if (end_block == start_block):
+                    time_equidistant  = True
+                    time_step = 1./rec_rate
+                    time_start = time_vec_sec[frame_vec[0]]
+                else:
+                    time_equidistant = False
+            else:
+                raise NotImplementedError("Coordinate selection for image coordinates is not supported yet.")
+        try:
+            frame_vec
+        except NameError:
+            frame_vec = np.arange(len(time_vec_sec),dtype=np.int32)
+            if (len(trig_times) != 1):
+                time_equidistant = False
+            else:
+                time_equidistant = True
+                   
+        x = (0, dims[0])
+        y = (0, dims[1])
+        info = {}
+        with h5py.File(path, 'r') as h5_obj_config:
+            try:
+                info['X Start'] = h5_obj_config['Settings']['X pos'][0]
+                info['Y Start'] = h5_obj_config['Settings']['Y pos'][0]
+            except Exception as e:
+                raise IOError("Could not find ROI x and y position in HDF5 file.")
+  
+        # We will set data_shape in flap.DataObject to show what the shape would be if data was read
+        if (no_data):
+            data_arr = None
+            data_shape = (dims[0],dims[1],len(frame_vec))
+        else:
+            file_size = os.path.getsize(path)  # in bytes!
+            file_size = file_size / 1024**3  # in GB
+            fraction = len(frame_vec) / n_frames            
+            if file_size * fraction > max_size:
+                print("The expected read size from {} is too large. (size: {} GB, limit: {} GB.)".format(path, file_size * fraction, max_size))
+                raise IOError("File size is too large!")          
+            data_arr = read_hdf5_arr(h5_data, x, y, frame_vec)
+            data_shape = data_arr.shape
+        h5_obj.close()
+    else:
+        raise ValueError("Invalid camera name.")
+    coord = []
     # TODO: check for equidistant time coordinates!
-    coord[0] = copy.deepcopy(flap.Coordinate(name='Time',
-                                             unit='Second',
-                                             mode=flap.CoordinateMode(equidistant=False),
-                                             values=time_vec_sec,
-                                             shape=time_vec_sec.shape,
-                                             dimension_list=[2])
-                             )
-    coord[1] = copy.deepcopy(flap.Coordinate(name='ETUTime',
-                                             unit='ETU',
-                                             mode=flap.CoordinateMode(equidistant=False),
-                                             values=time_vec_etu,
-                                             shape=time_vec_etu.shape,
-                                             dimension_list=[2])
-                             )
-    coord[2] = copy.deepcopy(flap.Coordinate(name='W7XTime',
-                                             unit='Nanosecond',
-                                             mode=flap.CoordinateMode(equidistant=False),
-                                             values=time_vec_w7x,
-                                             shape=time_vec_w7x.shape,
-                                             dimension_list=[2])
-                             )
-    coord[3] = copy.deepcopy(flap.Coordinate(name='Sample',
-                                             unit='',
-                                             mode=flap.CoordinateMode(equidistant=False),
-                                             values=frame_vec,
-                                             shape=frame_vec.shape,
-                                             dimension_list=[2])
-                             )
-    coord[4] = copy.deepcopy(flap.Coordinate(name='Image x',
-                                             unit='Pixel',
-                                             mode=flap.CoordinateMode(equidistant=True),
-                                             start=int(info['X Start']),
-                                             step=int(1),
-                                             shape=[],
-                                             dimension_list=[0])
-                             )
-    coord[5] = copy.deepcopy(flap.Coordinate(name='Image y',
-                                             unit='Pixel',
-                                             mode=flap.CoordinateMode(equidistant=True),
-                                             start=int(info['Y Start']),
-                                             step=int(1),
-                                             shape=[],
-                                             dimension_list=[1])
-                             )
+    if (time_equidistant):
+        coord.append(copy.deepcopy(flap.Coordinate(name='Time',
+                                                   unit='Second',
+                                                   mode=flap.CoordinateMode(equidistant=True),
+                                                   start = time_start, 
+                                                   step = time_step,
+                                                   shape=[],
+                                                   dimension_list=[2]
+                                                   )
+                                    )          
+                    )
+    else:
+        coord.append(copy.deepcopy(flap.Coordinate(name='Time',
+                                                   unit='Second',
+                                                   mode=flap.CoordinateMode(equidistant=False),
+                                                   values = time_vec_sec, 
+                                                   shape=time_vec_sec.shape,
+                                                   dimension_list=[2]
+                                                   )
+                                    )          
+                    )
+        
+        
+    if (time_vec_etu is not None):
+        coord.append(copy.deepcopy(flap.Coordinate(name='ETUTime',
+                                                   unit='ETU',
+                                                   mode=flap.CoordinateMode(equidistant=False),
+                                                   values=time_vec_etu,
+                                                   shape=time_vec_etu.shape,
+                                                   dimension_list=[2]
+                                                   )
+                                   )
+                    )
+    
+    if (time_vec_w7x is not None):
+        coord.append(copy.deepcopy(flap.Coordinate(name='W7XTime',
+                                                   unit='Nanosecond',
+                                                   mode=flap.CoordinateMode(equidistant=False),
+                                                   values=time_vec_w7x,
+                                                   shape=time_vec_w7x.shape,
+                                                   dimension_list=[2]
+                                                   )
+                                    )
+                    )
+    coord.append(copy.deepcopy(flap.Coordinate(name='Sample',
+                                               unit='',
+                                               mode=flap.CoordinateMode(equidistant=False),
+                                               values=frame_vec,
+                                               shape=frame_vec.shape,
+                                               dimension_list=[2]
+                                               )
+                              )
+                )
+    coord.append(copy.deepcopy(flap.Coordinate(name='Image x',
+                                               unit='Pixel',
+                                               mode=flap.CoordinateMode(equidistant=True),
+                                               start=int(info['X Start']),
+                                               step=int(1),
+                                               shape=[],
+                                               dimension_list=[0]
+                                               )
+                              )
+                )
+    coord.append(copy.deepcopy(flap.Coordinate(name='Image y',
+                                               unit='Pixel',
+                                               mode=flap.CoordinateMode(equidistant=True),
+                                               start=int(info['Y Start']),
+                                               step=int(1),
+                                               shape=[],
+                                               dimension_list=[1]
+                                               )
+                              )
+                 )
 
     data_title = "W7-X CAMERA data: {}".format(data_name)
     d = flap.DataObject(data_array=data_arr,
+                        data_shape=data_shape,
                         data_unit=flap.Unit(name='Frame', unit='Digit'),
                         coordinates=coord,
                         exp_id=exp_id,
