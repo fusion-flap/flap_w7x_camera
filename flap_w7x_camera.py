@@ -238,11 +238,11 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
         # Open the file and check the data path and read the data
         try:
             h5_obj = h5py.h5f.open(path.encode('utf-8'))
-            print(roi_num)
+            # print(roi_num)
             h5_path = '/ROIP/{}/{}Data'.format(roi_num.upper(), roi_num.upper())
-            print("Opening {} with path {}.".format(roi_num.upper(), h5_path))
+            # print("Opening {} with path {}.".format(roi_num.upper(), h5_path))
             h5_data = h5py.h5d.open(h5_obj, h5_path.encode('utf-8'))
-            print("Data size: {}.".format(h5_data.shape))
+            # print("Data size: {}.".format(h5_data.shape))
         except Exception as e:
             print("Something bad happened:")
             print(e)
@@ -309,7 +309,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
         time_vec_etu = None
         time_vec_w7x = None
         frame_per_trig = idldat['resa'][0][15]['frame_per_trig'][0]
-        rec_rate = idldat['resa'][0][15]['frame_per_trig'][0]
+        rec_rate = idldat['resa'][0][15]['rec_rate'][0]
         trig_times = []
         for i in range(0,len(time_vec_sec),frame_per_trig):
             trig_times.append(time_vec_sec[i])
@@ -318,11 +318,11 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                 # Open the file and check the data path and read the data
         try:
             h5_obj = h5py.h5f.open(path.encode('utf-8'))
-            print(roi_num)
+            # print(roi_num)
             h5_path = '/ROIP/{}/{}Data'.format(roi_num.upper(), roi_num.upper())
-            print("Opening {} with path {}.".format(roi_num.upper(), h5_path))
+            # print("Opening {} with path {}.".format(roi_num.upper(), h5_path))
             h5_data = h5py.h5d.open(h5_obj, h5_path.encode('utf-8'))
-            print("Data size: {}.".format(h5_data.shape))
+            # print("Data size: {}.".format(h5_data.shape))
         except Exception as e:
             print("Something bad happened:")
             print(e)        
