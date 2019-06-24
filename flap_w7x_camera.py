@@ -184,7 +184,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                 time = fnames[0].split('_')[3]
                 time = time.split('.')[0]
         else:
-            raise ValueError("Cannot find file without time parameter. Filename mask:"+filename_mask)
+            raise ValueError("Cannot find file without time parameter. Filename mask:"+filename_mask+" dp"+dp)
     else:
         time = fnames[0].split('_')[4]
         time = time.split('.')[0]
