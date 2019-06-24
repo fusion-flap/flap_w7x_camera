@@ -176,7 +176,9 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             raise ValueError("Multiple files found:{:s}.".format(os.path.join(dp,filename_mask))) 
     elif (len(fnames) == 0):
         if (time is not None):
-            filename_mask = "_".join([port.upper(), cam_str, date, (time + ".h5")])
+            for i in range(len(flist)):
+                flist[0] = flist.upper()
+            filename_mask = "_".join([port.upper(), cam_str, date, (time + ".h5")]).upper()
             fnames = fnmatch.filter(flist, filename_mask)
             if (len(fnames) == 0):
                 raise ValueError("Cannot find any file for this measurement.")
@@ -184,7 +186,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                 time = fnames[0].split('_')[3]
                 time = time.split('.')[0]
         else:
-            raise ValueError("Cannot find file without time parameter. Filename mask:"+filename_mask+" dp"+dp)
+            raise ValueError("Cannot find file without time parameter. Filename mask:"+filename_mask+" dp:"+dp)
     else:
         time = fnames[0].split('_')[4]
         time = time.split('.')[0]
