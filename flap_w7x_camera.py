@@ -307,7 +307,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             data_shape = data_arr.shape
         h5_obj.close()
     elif (cam_name == 'PHOTRON'):
-        time_fn = os.path.join(dp_timing,"_".join([port.upper(), cam_str, date, time, 'integ', ('v1' + ".sav")])) 
+        time_fn = os.path.join(dp_timing,"_".join([port, cam_str, date, time, 'integ', ('v1' + ".sav")])) 
         time_fn = time_fn.replace('\\','/',)
         try:
             idldat = io.readsav(time_fn,python_dict=True,verbose=False)
