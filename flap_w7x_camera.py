@@ -466,7 +466,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                  )
 
     data_title = "W7-X CAMERA data: {}".format(data_name)
-    d = flap.DataObject(data_array=data_arr,
+    d = flap.DataObject(data_array=np.flip(data_arr,axis=0),
                         data_shape=data_shape,
                         data_unit=flap.Unit(name='Frame', unit='Digit'),
                         coordinates=coord,
