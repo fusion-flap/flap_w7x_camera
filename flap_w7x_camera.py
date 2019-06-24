@@ -118,6 +118,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
     """
 
     default_options = {'Datapath': 'data',
+                       'Timing path': 'data',
                        'Time': None,
                        'Max_size': 4  # in GB!
                        }
@@ -131,6 +132,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
     datapath = _options['Datapath']
     time = _options['Time']
     max_size = _options['Max_size']
+    timing_path = _options['Timing path']
 
     if (coordinates is None):
         _coordinates = []
@@ -160,6 +162,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
     date = exp_id_split[0]
     exp_num = exp_id_split[1]
     dp = os.path.join(datapath, cam_name.upper(), port.upper(), date)
+    dp_timing = os.path.join(timing_path,date)
     flist = os.listdir(dp)
     if (time is None):
         filename_mask = "_".join([port.upper(), cam_str, date, exp_num, ("*.h5")])
@@ -299,7 +302,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             data_shape = data_arr.shape
         h5_obj.close()
     elif (cam_name == 'PHOTRON'):
-        time_fn = os.path.join(dp,"_".join([port.upper(), cam_str, date, time, 'integ', ('v1' + ".sav")])) 
+        time_fn = os.path.join(dp_timing,"_".join([port.upper(), cam_str, date, time, 'integ', ('v1' + ".sav")])) 
         time_fn = time_fn.replace('\\','/',)
         try:
             idldat = io.readsav(time_fn,python_dict=True,verbose=False)
@@ -385,6 +388,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                 print("The expected read size from {} is too large. (size: {} GB, limit: {} GB.)".format(path, file_size * fraction, max_size))
                 raise IOError("File size is too large!")          
             data_arr = read_hdf5_arr(h5_data, x, y, frame_vec)
+            data_arr = np.flip(data_arr,axis=0)
             data_shape = data_arr.shape
         h5_obj.close()
     else:
@@ -466,7 +470,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                  )
 
     data_title = "W7-X CAMERA data: {}".format(data_name)
-    d = flap.DataObject(data_array=np.flip(data_arr,axis=0),
+    d = flap.DataObject(data_array=data_arr,
                         data_shape=data_shape,
                         data_unit=flap.Unit(name='Frame', unit='Digit'),
                         coordinates=coord,
