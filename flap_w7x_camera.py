@@ -178,7 +178,8 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
         if (time is not None):
             for i in range(len(flist)):
                 flist[0] = flist.upper()
-            filename_mask = "_".join([port.upper(), cam_str, date, (time + ".h5")]).upper()
+            filename_mask = "_".join([port.upper(), cam_str, date, (time + ".h5")])
+            filename_mask = filename_mask.upper()
             fnames = fnmatch.filter(flist, filename_mask)
             if (len(fnames) == 0):
                 raise ValueError("Cannot find any file for this measurement.")
