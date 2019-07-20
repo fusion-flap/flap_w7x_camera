@@ -312,7 +312,15 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
         time_vec_sec = idldat['resa'][0][4]
         time_vec_etu = None
         time_vec_w7x = None
-        frame_per_trig = idldat['resa'][0][15]['frame_per_trig'][0]
+        try:
+            frame_per_trig = idldat['resa'][0][15]['frame_per_trig'][0]
+        except:
+            dt = time_vec_sec[1:] - time_vec_sec[:-1]
+            ind = np.nonzero(dt > dt[0]*2)[0]
+            if (len(ind) != 0):
+                frame_per_trig = ind[0] + 1
+            else:
+                frame_per_trig = len(time_vec_sec)
         rec_rate = idldat['resa'][0][15]['rec_rate'][0]
         trig_times = []
         for i in range(0,len(time_vec_sec),frame_per_trig):
