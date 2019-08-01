@@ -106,7 +106,7 @@ def read_hdf5_arr(h5_data, x, y, frame_vec):
     return arr_full
 
 
-def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None, coordinates=None):
+def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None, coordinates=None, data_source=None):
     """ Data read function for the W7-X EDICAM and Photron cameras (HDF5 format)
     data_name: Usually AEQ21_PHOTRON_ROIPx, ... (string) depending on configuration file
     exp_id: Experiment ID, YYYYMMDD.xxx, e.g. 20181018.016
@@ -493,6 +493,6 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
 def add_coordinate(data_object, new_coordinates, options=None):
     raise NotImplementedError("Coordinate conversions not implemented yet.")
 
-def register():
+def register(data_source=None):
     flap.register_data_source('W7X_CAMERA',
                               get_data_func=w7x_camera_get_data)
