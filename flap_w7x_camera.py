@@ -41,10 +41,10 @@ def get_camera_config_h5(h5_obj, roi_num):
     info['Clock']['Quality'] = np.array(h5_obj['Settings']['Clock']['Quality'])
     info['Event'] = dict()
     info['Event']['Event1'] = h5_obj['Settings']['Event']['Event1']['Action1'].keys()
-    print(list(h5_obj['Settings']['Event']['Event1'].keys()))
-    print(list(h5_obj['Settings']['Event']))
-    print(list(h5_obj['Settings']['Event'].keys()))
-    print(info['Event']['Event1'])
+#    print(list(h5_obj['Settings']['Event']['Event1'].keys()))
+#    print(list(h5_obj['Settings']['Event']))
+#    print(list(h5_obj['Settings']['Event'].keys()))
+#    print(info['Event']['Event1'])
     info['Exposure Settings'] = h5_obj['Settings']['Exposure Settings']
     info['Image Processing Settings'] = h5_obj['Settings']['Image Processing Settings']
     info['ROIP'] = h5_obj['Settings']['ROIP']
@@ -55,8 +55,7 @@ def get_camera_config_h5(h5_obj, roi_num):
     info['Y Start'] = h5_obj['Settings']['ROIP'][roi_num]['Y Start'][0]
     info['Y Len'] = h5_obj['Settings']['ROIP'][roi_num]['Y Len'][0]
 
-    print("-------------------------")
-    print(info)
+#   print(info)
     return info
 
 
@@ -108,12 +107,13 @@ def read_hdf5_arr(h5_data, x, y, frame_vec):
 
 def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None, coordinates=None, data_source=None):
     """ Data read function for the W7-X EDICAM and Photron cameras (HDF5 format)
-    data_name: Usually AEQ21_PHOTRON_ROIPx, ... (string) depending on configuration file
+    data_name: Usually AEQ21_<camera name>_ROIPx, ... (string) depending on configuration file
+                Camera name: either EDICAM or PHOTRON
     exp_id: Experiment ID, YYYYMMDD.xxx, e.g. 20181018.016
     Options:
             Datapath: the base path at which the camera files can be found (e.g. /data/W7X)
             Time: the date and time the recording was made: 123436 (12:34:36)
-            Camera name: either EDICAM or PHOTRON
+
             Port: the port number the camera was used, e.g. AEQ20
     """
 
@@ -203,13 +203,14 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                     try:
                         info = get_camera_config_ascii(path)
                     except Exception as e:
-                        print("Cannot read the info file!")
-                        print(e)
+                        raise ('Cannot read ROI info.')
+#                        print("Cannot read the info file!")
+#                        print(e)
                 finally:
                     if info is None:
                         info = dict()
     
-        print(info)
+        #print(info)
     
         # Read the time vectors
         with h5py.File(path, 'r') as h5_obj:
@@ -228,12 +229,14 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                 print(e)
                 time_vec_w7x = None
             
-            if time_vec_w7x is not None:
+            ##### THIS is a temporary fix: ETU comes first  SZ 29.10.2019
+            if time_vec_etu is not None:
+                print("Using ETU time vector [100 ns] for time vector [s] calculation!")
+#                time_vec_sec = (time_vec_etu - time_vec_etu[0]) / 1.e7
+                time_vec_sec = time_vec_etu / 1.e7
+            elif time_vec_w7x is not None:
                 print("Using W7-X time vector [ns] for time vector [s] calculation!")
                 time_vec_sec = (time_vec_w7x - time_vec_w7x[0]) / 1.e9
-            elif time_vec_etu is not None:
-                print("Using ETU time vector [100 ns] for time vector [s] calculation!")
-                time_vec_sec = (time_vec_etu - time_vec_etu[0]) / 1.e7
             else:
                 print("Cannot find any meaningful time vector!")
                 print("Exiting...")
@@ -267,7 +270,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
     #                if (coord.unit.unit is not 'Second'):
     #                    raise NotImplementedError("Your time coordinate unit is not in Seconds! Cannot use it (yet).")
                     if (coord.c_range is None):
-                        raise NotImplementedError("At present only simple tie range selection is supported.")
+                        raise NotImplementedError("At present only simple time range selection is supported.")
                     read_range = [float(coord.c_range[0]),float(coord.c_range[1])]
                     # Since np.where gives back indices, it is the same as the frame_vec
                     n_frames = len(time_vec_sec)
