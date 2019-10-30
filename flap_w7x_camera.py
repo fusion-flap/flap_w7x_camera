@@ -231,11 +231,11 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             
             ##### THIS is a temporary fix: ETU comes first  SZ 29.10.2019
             if time_vec_etu is not None:
-                print("Using ETU time vector [100 ns] for time vector [s] calculation!")
+#                print("Using ETU time vector [100 ns] for time vector [s] calculation!")
 #                time_vec_sec = (time_vec_etu - time_vec_etu[0]) / 1.e7
                 time_vec_sec = time_vec_etu / 1.e7
             elif time_vec_w7x is not None:
-                print("Using W7-X time vector [ns] for time vector [s] calculation!")
+#                print("Using W7-X time vector [ns] for time vector [s] calculation!")
                 time_vec_sec = (time_vec_w7x - time_vec_w7x[0]) / 1.e9
             else:
                 print("Cannot find any meaningful time vector!")
@@ -277,7 +277,8 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                     frame_vec = np.where((time_vec_sec >= read_range[0]) & (time_vec_sec <= read_range[1]))[0]
                     time_vec_sec = time_vec_sec[frame_vec]
                     time_vec_etu = time_vec_etu[frame_vec]
-                    time_vec_w7x = time_vec_w7x[frame_vec]
+                    if (time_vec_w7x is not None):
+                        time_vec_w7x = time_vec_w7x[frame_vec]
                 else:
                     raise NotImplementedError("Coordinate selection for image coordinates is not supported yet.")
             
