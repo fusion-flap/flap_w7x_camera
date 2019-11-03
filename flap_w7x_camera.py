@@ -54,7 +54,10 @@ def get_camera_config_h5(h5_obj, roi_num):
     info['X Len'] = h5_obj['Settings']['ROIP'][roi_num]['X Len'][0]
     info['Y Start'] = h5_obj['Settings']['ROIP'][roi_num]['Y Start'][0]
     info['Y Len'] = h5_obj['Settings']['ROIP'][roi_num]['Y Len'][0]
-
+    
+    if (roi_num.lower() != 'roip1'):
+        info['Y Start'] -= 21
+        info['X Start'] += 19
 #   print(info)
     return info
 
@@ -113,22 +116,35 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
     Options:
             Datapath: the base path at which the camera files can be found (e.g. /data/W7X)
             Time: the date and time the recording was made: 123436 (12:34:36)
-
-            Port: the port number the camera was used, e.g. AEQ20
+            Timing path: The location of the timing information
+            Max_size: Maximum data size to read in Gbytes
     """
 
     default_options = {'Datapath': 'data',
                        'Timing path': 'data',
                        'Time': None,
-                       'Max_size': 4  # in GB!
+                       'Max_size': 4, # in GB!
                        }
     _options = flap.config.merge_options(default_options, options, data_source='W7X_CAMERA')
 
     name_split = data_name.split("_")
     port = name_split[0]
+    if (port[0:3].upper() != 'AEQ'):
+        raise ValueError("Invalid port name: "+port)
+    if ((port[3:5] != '20') and (port[3:5] != '21') and (port[3:5] != '30') and (port[3:5] != '31')
+        and (port[3:5] != '40') and (port[3:5] != '40') and (port[3:5] != '50') and (port[3:5] != '51')):
+        raise ValueError("Invalid port number in port name:"+port)
     cam_name = name_split[1].upper()
     roi_num = name_split[2]
-
+    if (roi_num[0:4].upper() != "ROIP"):
+        raise ValueError('Invalid ROIP name:'+roi_num)
+    try:
+        n = int(roi_num[4])
+    except ValueError:
+        raise ValueError("Invalid ROI number in:"+roi_num)
+    if ((n < 1) or (n > 6)):
+        raise ValueError("Invalid ROI number in:"+roi_num)
+        
     datapath = _options['Datapath']
     time = _options['Time']
     max_size = _options['Max_size']
@@ -185,7 +201,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                 time = fnames[0].split('_')[3]
                 time = time.split('.')[0]
         else:
-            raise ValueError("Cannot find file without time parameter. Filename mask:"+filename_mask+" dp:"+dp)
+            raise ValueError("Cannot find data file:"+filename_mask+" datapath:"+dp)
     else:
         time = fnames[0].split('_')[4]
         time = time.split('.')[0]
@@ -257,36 +273,46 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
         # Read the data
         data_space = h5_data.get_space()
         dims = data_space.shape
-        if coordinates == None:
-            # Indices contain everything!
-            frame_vec = np.arange(0, dims[2])
-        else:
-            # Take indices from the coordinates!
-            # Only time coordinates are working as of now (2019. June 11.)
-            for coord in _coordinates:
-                if (type(coord) is not flap.Coordinate):
-                    raise TypeError("Coordinate description should be flap.Coordinate.")
-                if (coord.unit.name is 'Time'):  # assuming the unit to be Second
-    #                if (coord.unit.unit is not 'Second'):
-    #                    raise NotImplementedError("Your time coordinate unit is not in Seconds! Cannot use it (yet).")
-                    if (coord.c_range is None):
-                        raise NotImplementedError("At present only simple time range selection is supported.")
-                    read_range = [float(coord.c_range[0]),float(coord.c_range[1])]
-                    # Since np.where gives back indices, it is the same as the frame_vec
-                    n_frames = len(time_vec_sec)
-                    frame_vec = np.where((time_vec_sec >= read_range[0]) & (time_vec_sec <= read_range[1]))[0]
-                    time_vec_sec = time_vec_sec[frame_vec]
-                    time_vec_etu = time_vec_etu[frame_vec]
-                    if (time_vec_w7x is not None):
-                        time_vec_w7x = time_vec_w7x[frame_vec]
-                else:
-                    raise NotImplementedError("Coordinate selection for image coordinates is not supported yet.")
-            
+        frame_vec = np.arange(0, dims[2])
+        n_frames = len(frame_vec)
+
+        # Take indices from the coordinates!
+        # Only time coordinates are working as of now (2019. June 11.)
+        for coord in _coordinates:
+            if (type(coord) is not flap.Coordinate):
+                raise TypeError("Coordinate description should be flap.Coordinate.")
+            if (coord.unit.name is 'Time'):  # assuming the unit to be Second
+#                if (coord.unit.unit is not 'Second'):
+                if ((coord.c_range is None) and (coord.start is None) and (coord.values is None)):
+                    continue
+                if (type(coord.c_range) is None):
+                    raise NotImplementedError("Only simple time range selection is supported.")                        
+                read_range = [float(coord.c_range[0]),float(coord.c_range[1])]
+                # Since np.where gives back indices, it is the same as the frame_vec
+                frame_vec = np.where((time_vec_sec >= read_range[0]) & (time_vec_sec <= read_range[1]))[0]
+            elif (coord.unit.name is 'Sample'):
+                tsel = time_vec_sec[int(round(coord.c_range[0])) : int(round(coord.c_range[1] + 1))]
+                if (len(tsel) == 0):
+                    raise ValueError("No frame in sample range.")
+                frame_vec = np.arange((coord.c_range[1] - coord.c_range[0])+1) + coord.c_range[0]
+            else:
+                raise NotImplementedError("Coordinate selection is supported only for Time and Sample.")
+
+        if (len(frame_vec) == 0):
+            raise ValueError('No data in selection range.')
+        time_vec_sec = time_vec_sec[frame_vec]
+        time_vec_etu = time_vec_etu[frame_vec]
+        if (time_vec_w7x is not None):
+            time_vec_w7x = time_vec_w7x[frame_vec]
+        
+        time_start = time_vec_sec[0]
+        if (len(time_vec_sec) == 1):
+            time_equidistant = False
+        else:           
             dt = time_vec_sec[1:] - time_vec_sec[0:-1]
             if (np.nonzero((np.abs(dt[0] - dt) / dt[0]) > 0.001)[0].size == 0):
                 time_equidistant = True
                 time_step = dt[0]
-                time_start = time_vec_sec[0]
             else:
                 time_equidistant = False
         # TODO: make this for the spatial coordinates as well! (Binning etc.)
@@ -302,7 +328,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             fraction = len(frame_vec) / n_frames            
             if file_size * fraction > max_size:
                 print("The expected read size from {} is too large. (size: {} GB, limit: {} GB.)".format(path, file_size * fraction, max_size))
-                raise IOError("File size is too large!")          
+                raise IOError("Read size is too large! Set limit larger.")          
             data_arr = read_hdf5_arr(h5_data, x, y, frame_vec)
             data_shape = data_arr.shape
         h5_obj.close()
@@ -408,6 +434,10 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
         raise ValueError("Invalid camera name.")
     coord = []
     # TODO: check for equidistant time coordinates!
+    if (len(time_vec_sec) == 1):
+        dimlist = []
+    else:
+        dimlist = [2]
     if (time_equidistant):
         coord.append(copy.deepcopy(flap.Coordinate(name='Time',
                                                    unit='Second',
@@ -415,7 +445,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                                                    start = time_start, 
                                                    step = time_step,
                                                    shape=[],
-                                                   dimension_list=[2]
+                                                   dimension_list=dimlist
                                                    )
                                     )          
                     )
@@ -425,7 +455,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                                                    mode=flap.CoordinateMode(equidistant=False),
                                                    values = time_vec_sec, 
                                                    shape=time_vec_sec.shape,
-                                                   dimension_list=[2]
+                                                   dimension_list=dimlist
                                                    )
                                     )          
                     )
@@ -437,7 +467,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                                                    mode=flap.CoordinateMode(equidistant=False),
                                                    values=time_vec_etu,
                                                    shape=time_vec_etu.shape,
-                                                   dimension_list=[2]
+                                                   dimension_list=dimlist
                                                    )
                                    )
                     )
@@ -448,7 +478,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                                                    mode=flap.CoordinateMode(equidistant=False),
                                                    values=time_vec_w7x,
                                                    shape=time_vec_w7x.shape,
-                                                   dimension_list=[2]
+                                                   dimension_list=dimlist
                                                    )
                                     )
                     )
@@ -457,7 +487,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                                                mode=flap.CoordinateMode(equidistant=False),
                                                values=frame_vec,
                                                shape=frame_vec.shape,
-                                               dimension_list=[2]
+                                               dimension_list=dimlist
                                                )
                               )
                 )
@@ -483,9 +513,9 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                  )
 
     data_title = "W7-X CAMERA data: {}".format(data_name)
-    d = flap.DataObject(data_array=data_arr,
+    d = flap.DataObject(data_array=np.squeeze(data_arr),
                         data_shape=data_shape,
-                        data_unit=flap.Unit(name='Frame', unit='Digit'),
+                        data_unit=flap.Unit(name='Intensity', unit='Digit'),
                         coordinates=coord,
                         exp_id=exp_id,
                         data_title=data_title,
