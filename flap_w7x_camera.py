@@ -50,14 +50,14 @@ def get_camera_config_h5(h5_obj, roi_num):
     info['ROIP'] = h5_obj['Settings']['ROIP']
     info['Sensor Control'] = h5_obj['Settings']['Sensor Control']
     info['Sensor Settings'] = h5_obj['Settings']['Sensor Settings']
-    info['X Start'] = h5_obj['Settings']['ROIP'][roi_num]['X Start'][0]
-    info['X Len'] = h5_obj['Settings']['ROIP'][roi_num]['X Len'][0]
-    info['Y Start'] = h5_obj['Settings']['ROIP'][roi_num]['Y Start'][0]
-    info['Y Len'] = h5_obj['Settings']['ROIP'][roi_num]['Y Len'][0]
+    info['Y Start'] = h5_obj['Settings']['ROIP'][roi_num]['X Start'][0]
+    info['Y Len'] = h5_obj['Settings']['ROIP'][roi_num]['X Len'][0]
+    info['X Start'] = h5_obj['Settings']['ROIP'][roi_num]['Y Start'][0]
+    info['X Len'] = h5_obj['Settings']['ROIP'][roi_num]['Y Len'][0]
     
-    if (roi_num.lower() != 'roip1'):
-        info['Y Start'] -= 21
-        info['X Start'] += 19
+#    if (roi_num.lower() != 'roip1'):
+#        info['Y Start'] -= 21
+#        info['X Start'] += 19
 #   print(info)
     return info
 
@@ -234,15 +234,15 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                 time_vec_etu = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}ETU'.format(roi_num.upper())])
                 #print("ETU time vector found!")
             except Exception as e:
-                print("Cannot read ETU! Error message:")
-                print(e)
+#                print("Cannot read ETU! Error message:")
+#                print(e)
                 time_vec_etu = None
             try:
                 time_vec_w7x = np.array(h5_obj['ROIP']['{}'.format(roi_num.upper())]['{}W7XTime'.format(roi_num.upper())])
                 #print("W7-X time vector found!")
             except Exception as e:
-                print("Cannot read W7-X time units (ns)! Error message:")
-                print(e)
+#                print("Cannot read W7-X time units (ns)! Error message:")
+#                print(e)
                 time_vec_w7x = None
             
             ##### THIS is a temporary fix: ETU comes first  SZ 29.10.2019
@@ -254,8 +254,8 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
 #                print("Using W7-X time vector [ns] for time vector [s] calculation!")
                 time_vec_sec = (time_vec_w7x - time_vec_w7x[0]) / 1.e9
             else:
-                print("Cannot find any meaningful time vector!")
-                print("Exiting...")
+#                print("Cannot find any meaningful time vector!")
+#                print("Exiting...")
                 raise IOError("No time vector found!")
     
         # Open the file and check the data path and read the data
@@ -268,7 +268,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             # print("Data size: {}.".format(h5_data.shape))
         except Exception as e:
             print("Something bad happened:")
-            print(e)
+            raise e
         
         # Read the data
         data_space = h5_data.get_space()
@@ -367,7 +367,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
             # print("Data size: {}.".format(h5_data.shape))
         except Exception as e:
             print("Something bad happened:")
-            print(e)        
+            raise e
         data_space = h5_data.get_space()
         dims = data_space.shape
         if (dims[2] != len(time_vec_sec)):
@@ -438,6 +438,7 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
         dimlist = []
     else:
         dimlist = [2]
+
     if (time_equidistant):
         coord.append(copy.deepcopy(flap.Coordinate(name='Time',
                                                    unit='Second',
@@ -513,7 +514,9 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
                  )
 
     data_title = "W7-X CAMERA data: {}".format(data_name)
-    d = flap.DataObject(data_array=np.squeeze(data_arr),
+    if (data_arr is not None):
+        data_arr = np.squeeze(data_arr)
+    d = flap.DataObject(data_array=data_arr,
                         data_shape=data_shape,
                         data_unit=flap.Unit(name='Intensity', unit='Digit'),
                         coordinates=coord,
