@@ -185,6 +185,8 @@ def w7x_camera_get_data(exp_id=None, data_name=None, no_data=False, options=None
         filename_mask = "_".join([port.lower(), cam_str.lower(), date, exp_num, ("*.h5")])
     else:
         filename_mask = "_".join([port.lower(), cam_str.lower(), date, exp_num, (time + ".h5")])
+    for i in range(len(flist)):
+        flist[i] = flist[i].lower()
     fnames = fnmatch.filter(flist, filename_mask)
     if (len(fnames) > 1):
         if (time is not None):
